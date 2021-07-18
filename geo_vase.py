@@ -79,24 +79,39 @@ class GeoVase:
             # deals with triangle connecting to top face when row count is even
             if self.rows%2 == 0:
               verts.append([(i + 2)%self.columns, self.rows-1])
-
-        for i in range(2, len(verts)):
-            face = [verts[i - 2 + j] for j in range(3)]
+            verts.reverse()
+        for q in range(2, len(verts)):
+            face = [verts[q - 2 + j] for j in range(3)]
+            if i%2 == q%2:
+              face.reverse()
             faces.append([f[0]*self.rows + f[1] for f in face])
 
     # bottom face hits every other base point
     bottom_face = [s*2*self.rows for s in range(int(self.columns/2))]
+    bottom_face.reverse()
+    top_face = [(s*2 + 1 - self.rows%2)*self.rows + self.rows-1 for s in range(int(self.columns/2))]
 
     # for rendering generate triangles...
     bottom_triangles = []
 
     for i in range(2, len(bottom_face)):
         face = [bottom_face[0], bottom_face[i-1], bottom_face[i]]
+
         bottom_triangles.append(face)
 
+    # for rendering generate triangles...
+    top_triangles = []
+
+    for i in range(2, len(top_face)):
+        face = [top_face[0], top_face[i-1], top_face[i]]
+        top_triangles.append(face)
+
     self.verts = np.concatenate(vertices).tolist()
-    self.faces = faces + [bottom_face]
-    self.triangles = faces + bottom_triangles
+    self.faces = faces + [bottom_face, top_face]
+    for f in self.faces:
+      f.reverse()
+
+    self.triangles = faces + bottom_triangles + top_triangles
 
   def json(self):
     return json.dumps({ "vertices": self.verts, "faces": self.faces, "triangles": self.triangles })
