@@ -28,12 +28,11 @@ class GeoVase:
     ])
 
     self.rows = rows
-
     self.columns = sides*2
 
     self.calc()
 
-  def calc(self):
+  def calc_indexed_vertices(self):
     curve1 = bezier.Curve(self.bez_nodes1, degree=len(self.bez_nodes1)-1)
 
     # initial distribution along bezier curve
@@ -52,72 +51,78 @@ class GeoVase:
     # bezier curve lib has verts defined orthogonally to the way I think ¯\_(ツ)_/¯
     v1 = v.transpose()
 
-    # create list of 
+    # create list of vertices...
     vertices = [v1]
 
     for i in range(self.columns-1):
         r = R.from_euler('y', 360*(i+1)/self.columns, degrees=True)
         vertices.append(r.apply(v1))
 
+    self.indexed_vertices = vertices
+
+  def calc_indexed_faces(self):
     faces = []
 
-    for i in range(self.columns):
-        verts = []
-        if i%2 == 0:
-            verts.append([(i+2)%self.columns, 0])
-            for r in range(self.rows):
-                s = i + r%2
-                verts.append([s%self.columns, r])
-            # deals with triangle connecting to top face when row count is odd
-            if self.rows%2 == 1:
-              verts.append([(i + 2)%self.columns, self.rows-1])
+    for r in range(self.rows):
+      for c in range(r%2, self.columns, 2):
+
+        verts = [(c, r)]
+        
+        if r + 1 < self.rows:
+          verts.append(((c + 1)%self.columns, r +1))
+        
+        verts.append(((c + 2)%self.columns, r))
+
+        if r - 1 >= 0:
+          verts.append(((c + 1)%self.columns, r -1 ))
+        
+        if 0 < r < self.rows - 1:
+          faces.append([verts[3], verts[0], verts[1]])
+          faces.append([verts[1], verts[2], verts[3]])
         else:
-            for r in range(self.rows):
-                s = i + 1 - r%2
-                verts.append([s%self.columns, r])
+          faces.append(verts)
 
-            # deals with triangle connecting to top face when row count is even
-            if self.rows%2 == 0:
-              verts.append([(i + 2)%self.columns, self.rows-1])
-            verts.reverse()
-        for q in range(2, len(verts)):
-            face = [verts[q - 2 + j] for j in range(3)]
-            if i%2 == q%2:
-              face.reverse()
-            faces.append([f[0]*self.rows + f[1] for f in face])
+    bottom_face = [(c, 0) for c in range(0, self.columns, 2)]
+    top_face = [(c, self.rows - 1) for c in range(self.columns - self.rows%2 - 1, -1, -2)]
 
-    # bottom face hits every other base point
-    bottom_face = [s*2*self.rows for s in range(int(self.columns/2))]
-    bottom_face.reverse()
-    top_face = [(s*2 + 1 - self.rows%2)*self.rows + self.rows-1 for s in range(int(self.columns/2))]
+    self.indexed_faces = faces + [bottom_face, top_face]
 
-    # for rendering generate triangles...
-    bottom_triangles = []
 
-    for i in range(2, len(bottom_face)):
-        face = [bottom_face[0], bottom_face[i-1], bottom_face[i]]
+  def calc(self):
+    self.calc_indexed_faces()
+    self.calc_indexed_vertices()
 
-        bottom_triangles.append(face)
+    indexed_vert_to_vert = {}
+    verts = []
+    faces = []
+    triangles = []
 
-    # for rendering generate triangles...
-    top_triangles = []
+    for indexed_face in self.indexed_faces:
+      face = []
+      for iv in indexed_face:
+        if iv not in indexed_vert_to_vert:
+          indexed_vert_to_vert[iv] = len(verts)
+          verts.append(self.indexed_vertices[iv[0]][iv[1]])
+        face.append(indexed_vert_to_vert[iv])
+      faces.append(face)
 
-    for i in range(2, len(top_face)):
-        face = [top_face[0], top_face[i-1], top_face[i]]
-        top_triangles.append(face)
+      if len(face) == 3:
+        triangles.append(face)
+      else:
+        for i in range(2, len(face)):
+          triangles.append([face[0], face[i-1], face[i]])
 
-    self.verts = np.concatenate(vertices).tolist()
-    self.faces = faces + [bottom_face, top_face]
+    self.verts = verts
+    self.faces = faces
+    self.triangles = triangles
+
+    
+  def json(self):
     for f in self.faces:
       f.reverse()
-
-    self.triangles = faces + bottom_triangles + top_triangles
-
-  def json(self):
-    return json.dumps({ "vertices": self.verts, "faces": self.faces, "triangles": self.triangles })
+    return json.dumps({ "vertices": np.array(self.verts).tolist(), "faces": self.faces, "triangles": self.triangles })
 
 if __name__ == "__main__":
   gv = GeoVase()
-  gv.calc()
 
   print(gv.json())
