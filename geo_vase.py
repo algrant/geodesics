@@ -11,7 +11,7 @@ demo = {
   "bez_nodes": [
         [0.30, 1.00, 0.35], 
         [0.00, 1.00, 1.25], 
-        [0.00, 0.00, 0.00]
+        [0.00, 0.00, 0.00] # needs 0s to be 3D :)
     ],
   "weights": [0, 0.1, 0.2, 1.0]
 }
@@ -48,17 +48,40 @@ class GeoVase:
     # find all points along bezier curve
     v = curve1.evaluate_multi(weighted_vals[0])
 
+    # calculate 3D coordinate frame for bezier vertices
+    # hodograph === tangent
+    v1_tangent = np.array([curve1.evaluate_hodograph(s).transpose()[0] for s in weighted_vals[0]])
+
+    # norm is just rotated 90 degrees in 2D
+    v1_norm = v1_tangent.copy()
+    v1_norm[:, 0] = -v1_tangent[:, 1].copy()
+    v1_norm[:, 1] = v1_tangent[:, 0].copy()
+
+    # normalize frame vectors
+    v1_norm = v1_norm/np.linalg.norm(v1_norm, axis=1, keepdims=True)
+    v1_tangent = v1_tangent/np.linalg.norm(v1_tangent, axis=1, keepdims=True)
+
+    # cross must be pointing out of the page (as the other two are in 2D)
+    v1_cross = np.zeros(v1_tangent.shape)
+    v1_cross[:, 2] = 1
+
+    # build one coordinate frame vector (rows*3, 3)
+    v1_norm = np.concatenate((v1_norm, v1_tangent, v1_cross), axis=0)
+
     # bezier curve lib has verts defined orthogonally to the way I think ¯\_(ツ)_/¯
     v1 = v.transpose()
 
     # create list of vertices...
     vertices = [v1]
+    vnorms = [v1_norm]
 
     for i in range(self.columns-1):
         r = R.from_euler('y', 360*(i+1)/self.columns, degrees=True)
         vertices.append(r.apply(v1))
+        vnorms.append(r.apply(v1_norm))
 
     self.indexed_vertices = vertices
+    self.indexed_vnorms = vnorms
 
   def calc_indexed_faces(self):
     faces = []
@@ -94,6 +117,7 @@ class GeoVase:
 
     indexed_vert_to_vert = {}
     verts = []
+    vnorms = []
     faces = []
     triangles = []
 
@@ -103,6 +127,7 @@ class GeoVase:
         if iv not in indexed_vert_to_vert:
           indexed_vert_to_vert[iv] = len(verts)
           verts.append(self.indexed_vertices[iv[0]][iv[1]])
+          vnorms.append(self.indexed_vnorms[iv[0]][[iv[1], iv[1] + self.rows, iv[1] + self.rows*2], :])
         face.append(indexed_vert_to_vert[iv])
       faces.append(face)
 
@@ -113,6 +138,7 @@ class GeoVase:
           triangles.append([face[0], face[i-1], face[i]])
 
     self.verts = verts
+    self.vnorms = vnorms
     self.faces = faces
     self.triangles = triangles
 

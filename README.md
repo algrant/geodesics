@@ -17,3 +17,9 @@ conda failed me here, I ended up doing...
 ```
   ./miniconda3/envs/geodesics/bin/python -m pip install --upgrade bezier
 ```
+
+### pycsg
+
+```
+conda install -c bioconda pycsg
+```
