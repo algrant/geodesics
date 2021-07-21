@@ -13,11 +13,12 @@ demo = {
         [0.00, 1.00, 1.25], 
         [0.00, 0.00, 0.00] # needs 0s to be 3D :)
     ],
-  "weights": [0, 0.1, 0.2, 1.0]
+  "weights": [0, 0.1, 0.2, 1.0],
+  "spiral": 0
 }
 
 class GeoVase:
-  def __init__(self, rows=demo["rows"], sides=demo["sides"], bez_nodes=demo["bez_nodes"], weights=demo["weights"]):
+  def __init__(self, rows=demo["rows"], sides=demo["sides"], bez_nodes=demo["bez_nodes"], weights=demo["weights"], spiral=demo["spiral"]):
 
     # bezier edge profile
     self.bez_nodes1 = np.array(bez_nodes)
@@ -29,6 +30,8 @@ class GeoVase:
 
     self.rows = rows
     self.columns = sides*2
+
+    self.spiral = spiral
 
     self.calc()
 
@@ -70,6 +73,16 @@ class GeoVase:
 
     # bezier curve lib has verts defined orthogonally to the way I think ¯\_(ツ)_/¯
     v1 = v.transpose()
+
+    # Spiral v1 (and norms)
+    if self.spiral != 0:
+      for i in range(self.rows):
+        r = R.from_euler('y', self.spiral*(i+1)/self.rows, degrees=True)
+        v1[i, :] = r.apply(v1[i, :])
+        frame_indices = [i, i+self.rows,i+self.rows*2]
+        v1_norm[frame_indices, :] = r.apply(v1_norm[frame_indices, :])
+
+
 
     # create list of vertices...
     vertices = [v1]
