@@ -13,7 +13,7 @@ demo = {
         [0.00, 1.00, 1.25], 
         [0.00, 0.00, 0.00] # needs 0s to be 3D :)
     ],
-  "weights": [0, 0.1, 0.2, 1.0],
+  "weights": [0, 1.0],
   "spiral": 0
 }
 
@@ -42,11 +42,9 @@ class GeoVase:
     s_vals = np.linspace(0.0, 1.0, self.rows)
 
     # weighted distribution along bezier curve
-    try:
-      weight_curve = bezier.Curve(self.weights, degree=len(self.weights)-1)
-      weighted_vals = weight_curve.evaluate_multi(s_vals)
-    except:
-      weighted_vals = np.array([s_vals])
+
+    weight_curve = bezier.Curve(self.weights, degree=self.weights.shape[1]-1)
+    weighted_vals = weight_curve.evaluate_multi(s_vals)
 
     # find all points along bezier curve
     v = curve1.evaluate_multi(weighted_vals[0])
